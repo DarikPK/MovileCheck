@@ -13,7 +13,6 @@ def load_history():
         return []
     try:
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            # Asegurarse de que el archivo no esté vacío
             content = f.read()
             if not content:
                 return []
@@ -24,7 +23,6 @@ def load_history():
 def save_entry(doc_number, data):
     """
     Guarda una nueva entrada de búsqueda en el archivo de historial.
-    Las entradas más recientes se añaden al principio de la lista.
     """
     history = load_history()
 
@@ -34,8 +32,7 @@ def save_entry(doc_number, data):
         "resultado": data
     }
 
-    # Insertar la nueva entrada al principio para mostrarla primero
-    history.insert(0, new_entry)
+    history.insert(0, new_entry) # Añade al principio
 
     try:
         with open(HISTORY_FILE, "w", encoding="utf-8") as f:

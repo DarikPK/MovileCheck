@@ -29,7 +29,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val BASE_URL = "http://161.132.216.88/"
-        private const val DASHBOARD_URL_IDENTIFIER = "dashboard"
         private const val USER = "Prueba4"
         private const val PASS = "Prueba4"
         private const val TAG = "MainActivity"
@@ -52,21 +51,10 @@ class MainActivity : AppCompatActivity() {
         binding.webView.settings.javaScriptEnabled = true
         binding.webView.webViewClient = object : WebViewClient() {
 
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
-                Log.d(TAG, "Page started loading: $url")
-            }
-
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.d(TAG, "Page finished loading: $url")
-
-                if (url == BASE_URL) {
-                    Log.d(TAG, "Login page loaded. Injecting login script.")
-                    injectLoginScript(view)
-                } else if (url?.contains(DASHBOARD_URL_IDENTIFIER) == true) {
-                    handleDashboardLoad(view)
-                }
+                determinePageAndAct(view)
             }
 
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
@@ -82,19 +70,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun determinePageAndAct(view: WebView?) {
+        // Check for login form first, which is more specific than the search page.
+        view?.evaluateJavascript("(function() { return document.querySelector('input[type=\"email\"]') !== null; })();") { isLoginPage ->
+            if (isLoginPage == "true") {
+                Log.d(TAG, "Login page detected.")
+                injectLoginScript(view)
+                return@evaluateJavascript
+            }
+
+            // If not login page, check for search form
+            view?.evaluateJavascript("(function() { return document.getElementsByName('Documento').length > 0; })();") { isSearchPage ->
+                if (isSearchPage == "true") {
+                    Log.d(TAG, "Search page detected.")
+                    handleSearchPageLoad(view)
+                    return@evaluateJavascript
+                }
+
+                Log.w(TAG, "Unknown page state at ${view?.url}")
+            }
+        }
+    }
+
     private fun injectLoginScript(view: WebView?) {
+        Log.d(TAG, "Injecting login script.")
+        // Check if we are already logged in or trying to log in, to avoid loops
+        if (isSearchPageReady) return
+
         view?.evaluateJavascript("document.querySelector('input[type=\"email\"]').value = '$USER'; document.querySelector('input[type=\"password\"]').value = '$PASS';", null)
         view?.postDelayed({
-            val jsClickLogin = """
-                (function() {
-                    var buttons = document.getElementsByTagName('button');
-                    for (var i = 0; i < buttons.length; i++) {
-                        if (buttons[i].textContent.includes('Ingresar')) {
-                            buttons[i].click(); return;
-                        }
-                    }
-                })();
-            """
+            val jsClickLogin = "(function() { var buttons = document.getElementsByTagName('button'); for (var i = 0; i < buttons.length; i++) { if (buttons[i].textContent.includes('Ingresar')) { buttons[i].click(); return; } } })();"
             view.evaluateJavascript(jsClickLogin, null)
         }, 500)
 
@@ -108,19 +113,19 @@ class MainActivity : AppCompatActivity() {
         loginTimeoutHandler.postDelayed(loginTimeoutRunnable!!, LOGIN_TIMEOUT_MS)
     }
 
-    private fun handleDashboardLoad(view: WebView?) {
+    private fun handleSearchPageLoad(view: WebView?) {
         loginTimeoutRunnable?.let { loginTimeoutHandler.removeCallbacks(it) }
-        Log.d(TAG, "Dashboard page loaded.")
+
         if (!isSearchPageReady) {
             isSearchPageReady = true
             runOnUiThread {
                 Toast.makeText(this@MainActivity, "Listo para buscar", Toast.LENGTH_SHORT).show()
             }
         }
+
         if (isProcessingSearch) {
-            Log.d(TAG, "Search results loaded. Proceeding to extraction.")
+            Log.d(TAG, "Search results available. Extracting data.")
             extractData(view)
-            isProcessingSearch = false
         }
     }
 
@@ -151,56 +156,14 @@ class MainActivity : AppCompatActivity() {
             binding.textAddress.text = ""
             binding.textPhones.text = ""
         }
-        val jsSearchScript = """
-            (function() {
-                document.getElementsByName('Documento')[0].value = '$dni';
-                var buttons = document.getElementsByTagName('button');
-                for (var i = 0; i < buttons.length; i++) {
-                    if (buttons[i].textContent.includes('Buscar')) {
-                        buttons[i].click(); return;
-                    }
-                }
-            })();
-        """
+        val jsSearchScript = "(function() { document.getElementsByName('Documento')[0].value = '$dni'; var buttons = document.getElementsByTagName('button'); for (var i = 0; i < buttons.length; i++) { if (buttons[i].textContent.includes('Buscar')) { buttons[i].click(); return; } } })();"
         binding.webView.evaluateJavascript(jsSearchScript, null)
     }
 
     private fun extractData(view: WebView?) {
-        val jsExtractionScript = """
-            (function() {
-                const swal = document.querySelector('.swal2-container');
-                if (swal && (swal.innerText.includes('No se encontraron resultados') || swal.innerText.includes('sin resultados'))) {
-                    return JSON.stringify({ error: 'DNI no encontrado o sin resultados.' });
-                }
-                let personaData = {};
-                let telefonosData = [];
-                try {
-                    const pTable = document.evaluate('//div[@class="card" and .//h3[text()="Personas"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-                    if (pTable) {
-                        const cols = pTable.querySelectorAll('tr:first-child td');
-                        if (cols.length >= 9) {
-                            personaData.nombreCompleto = `${'$'}{cols[0].innerText.trim()} ${'$'}{cols[1].innerText.trim()} ${'$'}{cols[2].innerText.trim()}`;
-                            personaData.edad = cols[4].innerText.trim();
-                            personaData.direccion = cols[5].innerText.trim();
-                            personaData.ubigeo = `${'$'}{cols[6].innerText.trim()} / ${'$'}{cols[7].innerText.trim()} / ${'$'}{cols[8].innerText.trim()}`;
-                        }
-                    }
-                } catch (e) {}
-                try {
-                    const tTable = document.evaluate('//div[@class="card" and .//h3[text()="Teléfonos"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-                    if (tTable) {
-                        tTable.querySelectorAll('tr').forEach(row => {
-                            const cols = row.querySelectorAll('td');
-                            if (cols.length >= 3) {
-                                telefonosData.push(`${'$'}{cols[0].innerText.trim()} (${'$'}{cols[2].innerText.trim()})`);
-                            }
-                        });
-                    }
-                } catch(e) {}
-                return JSON.stringify({ persona: personaData, telefonos: telefonosData });
-            })();
-        """
+        val jsExtractionScript = "(function() { const swal = document.querySelector('.swal2-container'); if (swal && (swal.innerText.includes('No se encontraron resultados') || swal.innerText.includes('sin resultados'))) { return JSON.stringify({ error: 'DNI no encontrado o sin resultados.' }); } let personaData = {}; let telefonosData = []; try { const pTable = document.evaluate('//div[@class=\"card\" and .//h3[text()=\"Personas\"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (pTable) { const cols = pTable.querySelectorAll('tr:first-child td'); if (cols.length >= 9) { personaData.nombreCompleto = `${'$'}{cols[0].innerText.trim()} ${'$'}{cols[1].innerText.trim()} ${'$'}{cols[2].innerText.trim()}`; personaData.edad = cols[4].innerText.trim(); personaData.direccion = cols[5].innerText.trim(); personaData.ubigeo = `${'$'}{cols[6].innerText.trim()} / ${'$'}{cols[7].innerText.trim()} / ${'$'}{cols[8].innerText.trim()}`; } } } catch (e) {} try { const tTable = document.evaluate('//div[@class=\"card\" and .//h3[text()=\"Teléfonos\"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (tTable) { tTable.querySelectorAll('tr').forEach(row => { const cols = row.querySelectorAll('td'); if (cols.length >= 3) { telefonosData.push(`${'$'}{cols[0].innerText.trim()} (${'$'}{cols[2].innerText.trim()})`); } }); } } catch(e) {} return JSON.stringify({ persona: personaData, telefonos: telefonosData }); })();"
         view?.evaluateJavascript(jsExtractionScript) { result ->
+            isProcessingSearch = false // Search is complete, win or lose
             try {
                 if (result == null || result == "null") throw Exception("JavaScript returned null.")
                 val unescaped = result.substring(1, result.length - 1).replace("\\\"", "\"")
@@ -232,15 +195,16 @@ class MainActivity : AppCompatActivity() {
             val direccion = persona.optString("direccion", "")
             val ubigeo = persona.optString("ubigeo", "")
 
-            binding.textName.text = if (nombre.isBlank()) "No encontrado" else nombre
-            binding.textAge.text = if (edad.isBlank()) "No encontrado" else edad
-            binding.textAddress.text = if (direccion.isBlank()) "No encontrado" else "$direccion - $ubigeo"
+            binding.textName.text = if (nombre.isBlank()) "" else nombre
+            binding.textAge.text = if (edad.isBlank()) "" else edad
+            binding.textAddress.text = if (direccion.isBlank()) "" else "$direccion - $ubigeo"
 
             val telefonosList = (0 until telefonos.length()).map { telefonos.getString(it) }
-            binding.textPhones.text = if (telefonosList.isEmpty()) "No se encontraron teléfonos" else telefonosList.joinToString("\n")
+            binding.textPhones.text = if (telefonosList.isEmpty()) "" else telefonosList.joinToString("\n")
 
             if(nombre.isBlank() && telefonosList.isEmpty()) {
                  binding.textName.text = "No se encontraron datos para el DNI consultado."
+                 binding.textPhones.text = "No se encontraron teléfonos."
             }
         }
     }

@@ -3,6 +3,13 @@
     <string name="result_label_birthdate">Fecha de Nacimiento:</string>
     <string name="dni_hint">Ingrese DNI de 8 dígitos</string>
     <string name="search_button">Buscar</string>
+    <string name="email_hint">Correo Electrónico</string>
+    <string name="password_hint">Contraseña</string>
+    <string name="login_button">Ingresar</string>
+    <string name="register_button_text">Registrar</string>
+    <string name="no_account_text">¿No tienes cuenta? Regístrate</string>
+    <string name="already_have_account_text">¿Ya tienes cuenta? Ingresa</string>
+    <string name="action_logout">Cerrar Sesión</string>
     <string name="result_label_name">Nombre:</string>
     <string name="result_label_age">Edad:</string>
     <string name="result_label_address">Dirección:</string>

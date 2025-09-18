@@ -192,7 +192,7 @@ class MainActivity : AppCompatActivity() {
                         tTable.querySelectorAll('tr').forEach(row => {
                             const cols = row.querySelectorAll('td');
                             if (cols.length >= 3) {
-                                telefonosData.push(`${cols[0].innerText.trim()} (${cols[2].innerText.trim()})`);
+                                telefonosData.push(`${'$'}{cols[0].innerText.trim()} (${'$'}{cols[2].innerText.trim()})`);
                             }
                         });
                     }

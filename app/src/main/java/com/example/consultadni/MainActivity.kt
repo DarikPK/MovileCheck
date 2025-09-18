@@ -24,43 +24,54 @@ class MainActivity : AppCompatActivity() {
     private var isSearchPageReady = false
     private var isProcessingSearch = false
 
+    // Handlers for timeouts and polling
     private val loginTimeoutHandler = Handler(Looper.getMainLooper())
     private var loginTimeoutRunnable: Runnable? = null
+    private val searchPollHandler = Handler(Looper.getMainLooper())
+    private var searchPollRunnable: Runnable? = null
+    private var searchStartTime = 0L
 
     companion object {
         private const val BASE_URL = "http://161.132.216.88/"
         private const val USER = "Prueba4"
         private const val PASS = "Prueba4"
         private const val TAG = "MainActivity"
-        private const val LOGIN_TIMEOUT_MS = 15000L
+        private const val LOGIN_TIMEOUT_MS = 20000L
+        private const val SEARCH_TIMEOUT_MS = 20000L
+        private const val POLLING_INTERVAL_MS = 500L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
         setupWebView()
         binding.webView.loadUrl(BASE_URL)
-
         binding.searchButton.setOnClickListener { handleSearchClick() }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Prevent memory leaks by removing callbacks
+        loginTimeoutHandler.removeCallbacksAndMessages(null)
+        searchPollHandler.removeCallbacksAndMessages(null)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         binding.webView.settings.javaScriptEnabled = true
         binding.webView.webViewClient = object : WebViewClient() {
-
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.d(TAG, "Page finished loading: $url")
-                determinePageAndAct(view)
+                // This is now only for detecting the initial login/search page states
+                determineInitialPageState(view)
             }
 
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
-                    Log.e(TAG, "Error loading page: ${error?.description}")
+                    Log.e(TAG, "Error de red: ${error?.description}")
                     runOnUiThread {
                         Toast.makeText(this@MainActivity, "Error de red: ${error?.description}", Toast.LENGTH_LONG).show()
                         binding.progressBar.visibility = View.GONE
@@ -70,63 +81,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun determinePageAndAct(view: WebView?) {
-        // Check for login form first, which is more specific than the search page.
-        view?.evaluateJavascript("(function() { return document.querySelector('input[type=\"email\"]') !== null; })();") { isLoginPage ->
-            if (isLoginPage == "true") {
-                Log.d(TAG, "Login page detected.")
-                injectLoginScript(view)
-                return@evaluateJavascript
-            }
-
-            // If not login page, check for search form
-            view?.evaluateJavascript("(function() { return document.getElementsByName('Documento').length > 0; })();") { isSearchPage ->
-                if (isSearchPage == "true") {
-                    Log.d(TAG, "Search page detected.")
-                    handleSearchPageLoad(view)
-                    return@evaluateJavascript
+    private fun determineInitialPageState(view: WebView?) {
+        // We only care about detecting the search page to enable the UI
+        view?.evaluateJavascript("(function() { return document.getElementsByName('Documento').length > 0; })();") { isSearchPage ->
+            if (isSearchPage == "true" && !isSearchPageReady) {
+                Log.d(TAG, "Search page is ready.")
+                loginTimeoutRunnable?.let { loginTimeoutHandler.removeCallbacks(it) }
+                isSearchPageReady = true
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Listo para buscar", Toast.LENGTH_SHORT).show()
                 }
-
-                Log.w(TAG, "Unknown page state at ${view?.url}")
+            } else if (!isSearchPageReady) {
+                // If it's not the search page, assume it's the login page
+                injectLoginScript(view)
             }
         }
     }
 
     private fun injectLoginScript(view: WebView?) {
-        Log.d(TAG, "Injecting login script.")
-        // Check if we are already logged in or trying to log in, to avoid loops
-        if (isSearchPageReady) return
-
-        view?.evaluateJavascript("document.querySelector('input[type=\"email\"]').value = '$USER'; document.querySelector('input[type=\"password\"]').value = '$PASS';", null)
-        view?.postDelayed({
-            val jsClickLogin = "(function() { var buttons = document.getElementsByTagName('button'); for (var i = 0; i < buttons.length; i++) { if (buttons[i].textContent.includes('Ingresar')) { buttons[i].click(); return; } } })();"
-            view.evaluateJavascript(jsClickLogin, null)
-        }, 500)
-
-        loginTimeoutRunnable = Runnable {
-            if (!isSearchPageReady) {
-                Log.e(TAG, "Login timeout!")
-                Toast.makeText(this, "Error al iniciar sesión. Verifique las credenciales o la conexión.", Toast.LENGTH_LONG).show()
-                binding.progressBar.visibility = View.GONE
+        Log.d(TAG, "Attempting to inject login script.")
+        // Set a timeout only once
+        if (loginTimeoutRunnable == null) {
+            loginTimeoutRunnable = Runnable {
+                if (!isSearchPageReady) {
+                    Log.e(TAG, "Login timeout!")
+                    runOnUiThread {
+                        Toast.makeText(this, "Error al iniciar sesión. Verifique credenciales o conexión.", Toast.LENGTH_LONG).show()
+                        binding.progressBar.visibility = View.GONE
+                    }
+                }
             }
-        }
-        loginTimeoutHandler.postDelayed(loginTimeoutRunnable!!, LOGIN_TIMEOUT_MS)
-    }
-
-    private fun handleSearchPageLoad(view: WebView?) {
-        loginTimeoutRunnable?.let { loginTimeoutHandler.removeCallbacks(it) }
-
-        if (!isSearchPageReady) {
-            isSearchPageReady = true
-            runOnUiThread {
-                Toast.makeText(this@MainActivity, "Listo para buscar", Toast.LENGTH_SHORT).show()
-            }
+            loginTimeoutHandler.postDelayed(loginTimeoutRunnable!!, LOGIN_TIMEOUT_MS)
         }
 
-        if (isProcessingSearch) {
-            Log.d(TAG, "Search results available. Extracting data.")
-            extractData(view)
-        }
+        val jsLogin = "document.querySelector('input[type=\"email\"]').value = '$USER'; document.querySelector('input[type=\"password\"]').value = '$PASS'; (function() { var btns = document.getElementsByTagName('button'); for (var i = 0; i < btns.length; i++) { if (btns[i].textContent.includes('Ingresar')) { btns[i].click(); return; } } })();"
+        view?.evaluateJavascript(jsLogin, null)
     }
 
     private fun handleSearchClick() {
@@ -156,32 +145,67 @@ class MainActivity : AppCompatActivity() {
             binding.textAddress.text = ""
             binding.textPhones.text = ""
         }
-        val jsSearchScript = "(function() { document.getElementsByName('Documento')[0].value = '$dni'; var buttons = document.getElementsByTagName('button'); for (var i = 0; i < buttons.length; i++) { if (buttons[i].textContent.includes('Buscar')) { buttons[i].click(); return; } } })();"
+
+        // Click the search button on the web page
+        val jsSearchScript = "(function() { document.getElementsByName('Documento')[0].value = '$dni'; var btns = document.getElementsByTagName('button'); for (var i = 0; i < btns.length; i++) { if (btns[i].textContent.includes('Buscar')) { btns[i].click(); return; } } })();"
         binding.webView.evaluateJavascript(jsSearchScript, null)
+
+        // Start polling for results
+        searchStartTime = System.currentTimeMillis()
+        searchPollRunnable = object : Runnable {
+            override fun run() {
+                Log.d(TAG, "Polling for search results...")
+                if (System.currentTimeMillis() - searchStartTime > SEARCH_TIMEOUT_MS) {
+                    Log.e(TAG, "Search timed out.")
+                    isProcessingSearch = false
+                    runOnUiThread {
+                        binding.progressBar.visibility = View.GONE
+                        Toast.makeText(this@MainActivity, "La búsqueda tardó demasiado.", Toast.LENGTH_LONG).show()
+                    }
+                    return
+                }
+                checkSearchResults(binding.webView)
+            }
+        }
+        searchPollHandler.postDelayed(searchPollRunnable!!, POLLING_INTERVAL_MS)
     }
 
-    private fun extractData(view: WebView?) {
-        val jsExtractionScript = "(function() { const swal = document.querySelector('.swal2-container'); if (swal && (swal.innerText.includes('No se encontraron resultados') || swal.innerText.includes('sin resultados'))) { return JSON.stringify({ error: 'DNI no encontrado o sin resultados.' }); } let personaData = {}; let telefonosData = []; try { const pTable = document.evaluate('//div[@class=\"card\" and .//h3[text()=\"Personas\"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (pTable) { const cols = pTable.querySelectorAll('tr:first-child td'); if (cols.length >= 9) { personaData.nombreCompleto = `${'$'}{cols[0].innerText.trim()} ${'$'}{cols[1].innerText.trim()} ${'$'}{cols[2].innerText.trim()}`; personaData.edad = cols[4].innerText.trim(); personaData.direccion = cols[5].innerText.trim(); personaData.ubigeo = `${'$'}{cols[6].innerText.trim()} / ${'$'}{cols[7].innerText.trim()} / ${'$'}{cols[8].innerText.trim()}`; } } } catch (e) {} try { const tTable = document.evaluate('//div[@class=\"card\" and .//h3[text()=\"Teléfonos\"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (tTable) { tTable.querySelectorAll('tr').forEach(row => { const cols = row.querySelectorAll('td'); if (cols.length >= 3) { telefonosData.push(`${'$'}{cols[0].innerText.trim()} (${'$'}{cols[2].innerText.trim()})`); } }); } } catch(e) {} return JSON.stringify({ persona: personaData, telefonos: telefonosData }); })();"
-        view?.evaluateJavascript(jsExtractionScript) { result ->
-            isProcessingSearch = false // Search is complete, win or lose
+    private fun checkSearchResults(view: WebView) {
+        val jsExtractionScript = "(function() { const swal = document.querySelector('.swal2-container'); if (swal && (swal.innerText.includes('No se encontraron resultados') || swal.innerText.includes('sin resultados'))) { return JSON.stringify({ status: 'error', message: 'DNI no encontrado o sin resultados.' }); } const pTable = document.evaluate('//div[@class=\"card\" and .//h3[text()=\"Personas\"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (!pTable || pTable.innerText.trim() === '') { return JSON.stringify({ status: 'loading' }); } let personaData = {}; let telefonosData = []; try { const cols = pTable.querySelectorAll('tr:first-child td'); if (cols.length >= 9) { personaData.nombreCompleto = `${'$'}{cols[0].innerText.trim()} ${'$'}{cols[1].innerText.trim()} ${'$'}{cols[2].innerText.trim()}`; personaData.edad = cols[4].innerText.trim(); personaData.direccion = cols[5].innerText.trim(); personaData.ubigeo = `${'$'}{cols[6].innerText.trim()} / ${'$'}{cols[7].innerText.trim()} / ${'$'}{cols[8].innerText.trim()}`; } } catch (e) {} try { const tTable = document.evaluate('//div[@class=\"card\" and .//h3[text()=\"Teléfonos\"]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (tTable) { tTable.querySelectorAll('tr').forEach(row => { const cols = row.querySelectorAll('td'); if (cols.length >= 3) { telefonosData.push(`${'$'}{cols[0].innerText.trim()} (${'$'}{cols[2].innerText.trim()})`); } }); } } catch(e) {} return JSON.stringify({ status: 'success', data: { persona: personaData, telefonos: telefonosData } }); })();"
+
+        view.evaluateJavascript(jsExtractionScript) { result ->
             try {
-                if (result == null || result == "null") throw Exception("JavaScript returned null.")
+                if (result == null || result == "null") {
+                    // Script might fail to execute, poll again
+                    searchPollHandler.postDelayed(searchPollRunnable!!, POLLING_INTERVAL_MS)
+                    return@evaluateJavascript
+                }
                 val unescaped = result.substring(1, result.length - 1).replace("\\\"", "\"")
                 val json = JSONObject(unescaped)
 
-                if (json.has("error")) {
-                    throw Exception(json.getString("error"))
+                when (json.optString("status")) {
+                    "success" -> {
+                        isProcessingSearch = false
+                        val data = json.getJSONObject("data")
+                        val persona = data.getJSONObject("persona")
+                        val telefonos = data.getJSONArray("telefonos")
+                        updateUiWithResults(persona, telefonos)
+                    }
+                    "error" -> {
+                        isProcessingSearch = false
+                        throw Exception(json.getString("message"))
+                    }
+                    "loading" -> {
+                        // It's still loading, post the runnable again
+                        searchPollHandler.postDelayed(searchPollRunnable!!, POLLING_INTERVAL_MS)
+                    }
                 }
-
-                val persona = json.getJSONObject("persona")
-                val telefonos = json.getJSONArray("telefonos")
-                updateUiWithResults(persona, telefonos)
             } catch (e: Exception) {
+                isProcessingSearch = false
                 Log.e(TAG, "Error processing result: ${e.message}")
                 runOnUiThread {
-                    Toast.makeText(this, e.message ?: "No se pudieron extraer los datos.", Toast.LENGTH_LONG).show()
                     binding.progressBar.visibility = View.GONE
-                    binding.textName.text = "No se encontraron datos."
+                    Toast.makeText(this, e.message ?: "No se pudieron extraer los datos.", Toast.LENGTH_LONG).show()
                 }
             }
         }

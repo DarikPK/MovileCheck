@@ -179,10 +179,10 @@ class MainActivity : AppCompatActivity() {
                     if (pTable) {
                         const cols = pTable.querySelectorAll('tr:first-child td');
                         if (cols.length >= 9) {
-                            personaData.nombreCompleto = `${cols[0].innerText.trim()} ${cols[1].innerText.trim()} ${cols[2].innerText.trim()}`;
+                            personaData.nombreCompleto = `${'$'}{cols[0].innerText.trim()} ${'$'}{cols[1].innerText.trim()} ${'$'}{cols[2].innerText.trim()}`;
                             personaData.edad = cols[4].innerText.trim();
                             personaData.direccion = cols[5].innerText.trim();
-                            personaData.ubigeo = `${cols[6].innerText.trim()} / ${cols[7].innerText.trim()} / ${cols[8].innerText.trim()}`;
+                            personaData.ubigeo = `${'$'}{cols[6].innerText.trim()} / ${'$'}{cols[7].innerText.trim()} / ${'$'}{cols[8].innerText.trim()}`;
                         }
                     }
                 } catch (e) {}

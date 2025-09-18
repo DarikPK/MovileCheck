@@ -136,6 +136,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun performSearch(dni: String) {
+        // Stop any previous polling task before starting a new one. This is critical.
+        searchPollHandler.removeCallbacksAndMessages(null)
+
         Log.d(TAG, "Performing search for DNI: $dni")
         isProcessingSearch = true
         runOnUiThread {

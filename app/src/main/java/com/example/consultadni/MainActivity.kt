@@ -150,6 +150,12 @@ class MainActivity : AppCompatActivity() {
         val jsSearchScript = "(function() { document.getElementsByName('Documento')[0].value = '$dni'; var btns = document.getElementsByTagName('button'); for (var i = 0; i < btns.length; i++) { if (btns[i].textContent.includes('Buscar')) { btns[i].click(); return; } } })();"
         binding.webView.evaluateJavascript(jsSearchScript, null)
 
+        // Immediately clear previous results from the DOM to ensure the poller waits for new data
+        val jsClearResultsScript = "(function() { try { document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Personas\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.innerHTML = ''; document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Teléfonos\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.innerHTML = ''; } catch(e){} })();"
+        binding.webView.postDelayed({
+            binding.webView.evaluateJavascript(jsClearResultsScript, null)
+        }, 200) // A small delay to ensure the search click has been processed before clearing
+
         // Start polling for results
         searchStartTime = System.currentTimeMillis()
         searchPollRunnable = object : Runnable {

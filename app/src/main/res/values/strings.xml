@@ -1,5 +1,6 @@
 <resources>
-    <string name="app_name">Consulta DNI</string>
+    <string name="app_name">Consulta de Datos</string>
+    <string name="result_label_birthdate">Fecha de Nacimiento:</string>
     <string name="dni_hint">Ingrese DNI de 8 dígitos</string>
     <string name="search_button">Buscar</string>
     <string name="result_label_name">Nombre:</string>

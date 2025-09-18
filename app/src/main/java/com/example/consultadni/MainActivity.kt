@@ -144,6 +144,7 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             binding.progressBar.visibility = View.VISIBLE
             binding.textName.text = ""
+            binding.textBirthdate.text = ""
             binding.textAge.text = ""
             binding.textAddress.text = ""
             binding.textPhones.text = ""
@@ -180,7 +181,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkSearchResults(view: WebView) {
-        val jsExtractionScript = "(function() { const loadingIndicator = document.evaluate(\"//*[contains(., 'Cargando') or contains(., 'espere')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (loadingIndicator && loadingIndicator.offsetParent !== null) { return JSON.stringify({ status: 'loading', message: 'Indicador de carga visible.' }); } const swal = document.querySelector('.swal2-container'); if (swal && (swal.innerText.includes('No se encontraron resultados') || swal.innerText.includes('sin resultados'))) { return JSON.stringify({ status: 'error', message: 'DNI no encontrado o sin resultados.' }); } const pTable = document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Personas\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (pTable && pTable.querySelector('tr') && pTable.innerText.trim().length > 0) { let personaData = {}; let telefonosData = []; try { const cols = pTable.querySelectorAll('tr:first-child td'); if (cols.length >= 9) { personaData.nombreCompleto = `${'$'}{cols[0].innerText.trim()} ${'$'}{cols[1].innerText.trim()} ${'$'}{cols[2].innerText.trim()}`; personaData.edad = cols[4].innerText.trim(); personaData.direccion = cols[5].innerText.trim(); personaData.ubigeo = `${'$'}{cols[6].innerText.trim()} / ${'$'}{cols[7].innerText.trim()} / ${'$'}{cols[8].innerText.trim()}`; } } catch (e) {} try { const tTable = document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Teléfonos\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (tTable) { tTable.querySelectorAll('tr').forEach(row => { const cols = row.querySelectorAll('td'); if (cols.length >= 3) { telefonosData.push(`${'$'}{cols[0].innerText.trim()} (${'$'}{cols[2].innerText.trim()})`); } }); } } catch(e) {} return JSON.stringify({ status: 'success', data: { persona: personaData, telefonos: telefonosData } }); } return JSON.stringify({ status: 'loading', message: 'Esperando tabla de resultados...' }); })();"
+        val jsExtractionScript = "(function() { const loadingIndicator = document.evaluate(\"//*[contains(., 'Cargando') or contains(., 'espere')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (loadingIndicator && loadingIndicator.offsetParent !== null) { return JSON.stringify({ status: 'loading', message: 'Indicador de carga visible.' }); } const swal = document.querySelector('.swal2-container'); if (swal && (swal.innerText.includes('No se encontraron resultados') || swal.innerText.includes('sin resultados'))) { return JSON.stringify({ status: 'error', message: 'DNI no encontrado o sin resultados.' }); } const pTable = document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Personas\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (pTable && pTable.querySelector('tr') && pTable.innerText.trim().length > 0) { let personaData = {}; let telefonosData = []; try { const cols = pTable.querySelectorAll('tr:first-child td'); if (cols.length >= 9) { personaData.nombreCompleto = `${'$'}{cols[0].innerText.trim()} ${'$'}{cols[1].innerText.trim()} ${'$'}{cols[2].innerText.trim()}`; personaData.fechaNacimiento = cols[3].innerText.trim(); personaData.edad = cols[4].innerText.trim(); personaData.direccion = cols[5].innerText.trim(); personaData.ubigeo = `${'$'}{cols[6].innerText.trim()} / ${'$'}{cols[7].innerText.trim()} / ${'$'}{cols[8].innerText.trim()}`; } } catch (e) {} try { const tTable = document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Teléfonos\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; if (tTable) { tTable.querySelectorAll('tr').forEach(row => { const cols = row.querySelectorAll('td'); if (cols.length >= 3) { telefonosData.push(`${'$'}{cols[0].innerText.trim()} (${'$'}{cols[2].innerText.trim()})`); } }); } } catch(e) {} return JSON.stringify({ status: 'success', data: { persona: personaData, telefonos: telefonosData } }); } return JSON.stringify({ status: 'loading', message: 'Esperando tabla de resultados...' }); })();"
 
         view.evaluateJavascript(jsExtractionScript) { result ->
             try {
@@ -224,20 +225,22 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             binding.progressBar.visibility = View.GONE
             val nombre = persona.optString("nombreCompleto", "")
+            val fechaNacimiento = persona.optString("fechaNacimiento", "")
             val edad = persona.optString("edad", "")
             val direccion = persona.optString("direccion", "")
             val ubigeo = persona.optString("ubigeo", "")
 
             binding.textName.text = if (nombre.isBlank()) "" else nombre
+            binding.textBirthdate.text = if (fechaNacimiento.isBlank()) "" else fechaNacimiento
             binding.textAge.text = if (edad.isBlank()) "" else edad
             binding.textAddress.text = if (direccion.isBlank()) "" else "$direccion - $ubigeo"
 
             val telefonosList = (0 until telefonos.length()).map { telefonos.getString(it) }
             binding.textPhones.text = if (telefonosList.isEmpty()) "" else telefonosList.joinToString("\n")
 
-            if(nombre.isBlank() && telefonosList.isEmpty()) {
-                 binding.textName.text = "No se encontraron datos para el DNI consultado."
-                 binding.textPhones.text = "No se encontraron teléfonos."
+            if (nombre.isBlank() && telefonosList.isEmpty()) {
+                binding.textName.text = "No se encontraron datos para el DNI consultado."
+                binding.textPhones.text = "No se encontraron teléfonos."
             }
         }
     }

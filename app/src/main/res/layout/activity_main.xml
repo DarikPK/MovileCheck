@@ -66,6 +66,21 @@
                 tools:text="Juan Perez"/>
 
             <TextView
+                android:id="@+id/labelBirthdate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/result_label_birthdate"
+                android:textStyle="bold"
+                android:layout_marginTop="8dp"/>
+
+            <TextView
+                android:id="@+id/textBirthdate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                tools:text="1990-01-01"/>
+
+            <TextView
                 android:id="@+id/labelAge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

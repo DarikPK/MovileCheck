@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Consulta DNI</string>
+    <string name="dni_hint">Ingrese DNI de 8 dígitos</string>
+    <string name="search_button">Buscar</string>
+    <string name="result_label_name">Nombre:</string>
+    <string name="result_label_age">Edad:</string>
+    <string name="result_label_address">Dirección:</string>
+    <string name="result_label_phones">Teléfonos:</string>
+</resources>

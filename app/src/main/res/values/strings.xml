@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">ConsultaDNI</string>
+    <string name="dni_hint">Ingrese su DNI</string>
+    <string name="search_button">Buscar</string>
+    <string name="result_label_name">Nombre:</string>
+    <string name="result_label_birthdate">Fecha de Nac.:</string>
+    <string name="result_label_age">Edad:</string>
+    <string name="result_label_address">Dirección:</string>
+    <string name="result_label_phones">Teléfonos:</string>
 </resources>

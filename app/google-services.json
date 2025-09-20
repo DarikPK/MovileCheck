@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "563411812134",
+    "project_id": "consulta-datos-app",
+    "storage_bucket": "consulta-datos-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:563411812134:android:d4d464494d3c63052f0be7",
+        "android_client_info": {
+          "package_name": "com.example.consultadni"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkhSbN8S_LVn2I6asGIMv21lclUS_Ylc0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

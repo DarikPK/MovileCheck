@@ -135,7 +135,7 @@ class MainActivity : AppCompatActivity() {
         if (!isWithinAllowedHours()) {
             AlertDialog.Builder(this)
                 .setTitle("Horario de Consulta")
-                .setMessage("Las consultas no están disponibles más que en el horario de 7am a 11:30pm.")
+                .setMessage(R.string.time_restriction_message)
                 .setPositiveButton("Entendido", null)
                 .show()
             return

@@ -12,6 +12,7 @@
     <string name="login_email_hint">Correo Electrónico</string>
     <string name="login_password_hint">Contraseña</string>
     <string name="login_button_text">Ingresar</string>
+    <string name="login_checkbox_save_password">Guardar contraseña</string>
 
     <!-- Dashboard Screen -->
     <string name="dashboard_button_data">Consulta de Datos</string>
@@ -23,4 +24,7 @@
     <string name="buro_radio_ruc">RUC</string>
     <string name="buro_input_hint">Ingrese número</string>
     <string name="buro_search_button">Buscar</string>
+
+    <!-- Time Restriction -->
+    <string name="time_restriction_message">Las consultas solo están disponibles en el horario de 7am a 11:30pm.</string>
 </resources>

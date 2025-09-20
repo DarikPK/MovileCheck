@@ -47,6 +47,15 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
+    <CheckBox
+        android:id="@+id/save_password_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/login_checkbox_save_password"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/password_layout" />
+
     <com.google.android.material.button.MaterialButton
         android:id="@+id/login_button"
         android:layout_width="0dp"
@@ -56,6 +65,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/password_layout" />
+        app:layout_constraintTop_toBottomOf="@+id/save_password_checkbox" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

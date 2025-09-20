@@ -2,9 +2,13 @@ package com.example.consultadni
 
 import android.os.Bundle
 import android.text.InputFilter
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.example.consultadni.data.BuroRepository
 import com.example.consultadni.databinding.ActivityBuroBinding
+import kotlinx.coroutines.launch
 
 class BuroActivity : AppCompatActivity() {
 
@@ -45,23 +49,34 @@ class BuroActivity : AppCompatActivity() {
         val isDni = binding.radioDni.isChecked
 
         var isValid = true
-        if (isDni) {
-            if (number.length != 8) {
-                binding.numberInputLayout.error = "El DNI debe tener 8 dígitos."
-                isValid = false
-            }
-        } else { // isRUC
-            if (number.length != 11) {
-                binding.numberInputLayout.error = "El RUC debe tener 11 dígitos."
-                isValid = false
-            }
+        if (isDni && number.length != 8) {
+            binding.numberInputLayout.error = "El DNI debe tener 8 dígitos."
+            isValid = false
+        } else if (!isDni && number.length != 11) {
+            binding.numberInputLayout.error = "El RUC debe tener 11 dígitos."
+            isValid = false
         }
 
         if (isValid) {
-            binding.numberInputLayout.error = null // Clear error
-            val searchType = if (isDni) "DNI" else "RUC"
-            Toast.makeText(this, "Buscando $searchType: $number", Toast.LENGTH_SHORT).show()
-            // TODO: Implement actual search logic here
+            binding.numberInputLayout.error = null
+            binding.buroSearchButton.isEnabled = false // Disable button during search
+            // In a real app, you'd show a ProgressBar
+            // binding.progressBar.visibility = View.VISIBLE
+
+            // Call repo in background
+            val repo = BuroRepository()
+            lifecycleScope.launch {
+                val result = repo.consultaNumero(number, isDni)
+                // Re-enable button and hide progress bar on the main thread
+                binding.buroSearchButton.isEnabled = true
+                // binding.progressBar.visibility = View.GONE
+                result.onSuccess { json ->
+                    // For now, just show the raw JSON
+                    Toast.makeText(this@BuroActivity, "Consulta OK: ${json}", Toast.LENGTH_LONG).show()
+                }.onFailure { e ->
+                    Toast.makeText(this@BuroActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 }

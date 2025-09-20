@@ -7,4 +7,9 @@
     <string name="result_label_age">Edad:</string>
     <string name="result_label_address">Dirección:</string>
     <string name="result_label_phones">Teléfonos:</string>
+
+    <!-- Login Screen -->
+    <string name="login_email_hint">Correo Electrónico</string>
+    <string name="login_password_hint">Contraseña</string>
+    <string name="login_button_text">Ingresar</string>
 </resources>

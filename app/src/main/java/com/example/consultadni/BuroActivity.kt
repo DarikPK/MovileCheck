@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.consultadni.data.BuroRepository
 import com.example.consultadni.databinding.ActivityBuroBinding
+import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
 class BuroActivity : AppCompatActivity() {
@@ -59,21 +60,19 @@ class BuroActivity : AppCompatActivity() {
 
         if (isValid) {
             binding.numberInputLayout.error = null
-            binding.buroSearchButton.isEnabled = false // Disable button during search
-            // In a real app, you'd show a ProgressBar
+            binding.buroSearchButton.isEnabled = false
             // binding.progressBar.visibility = View.VISIBLE
 
-            // Call repo in background
             val repo = BuroRepository()
             lifecycleScope.launch {
                 val result = repo.consultaNumero(number, isDni)
-                // Re-enable button and hide progress bar on the main thread
+
                 binding.buroSearchButton.isEnabled = true
                 // binding.progressBar.visibility = View.GONE
-                result.onSuccess { json ->
-                    // For now, just show the raw JSON
+
+                result.onSuccess { json: JsonObject ->
                     Toast.makeText(this@BuroActivity, "Consulta OK: ${json}", Toast.LENGTH_LONG).show()
-                }.onFailure { e ->
+                }.onFailure { e: Throwable ->
                     Toast.makeText(this@BuroActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }

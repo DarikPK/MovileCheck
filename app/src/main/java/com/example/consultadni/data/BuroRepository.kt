@@ -1,6 +1,7 @@
 package com.example.consultadni.data
 
 import com.google.gson.JsonObject
+import kotlin.Result
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient

@@ -1,7 +1,6 @@
 package com.example.consultadni
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,10 +11,12 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.consultadni.databinding.ActivityMainBinding
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
 
@@ -118,7 +119,28 @@ class MainActivity : AppCompatActivity() {
         view?.evaluateJavascript(jsLogin, null)
     }
 
+    private fun isWithinAllowedHours(): Boolean {
+        val calendar = Calendar.getInstance()
+        val hour = calendar.get(Calendar.HOUR_OF_DAY) // 24-hour format
+        val minute = calendar.get(Calendar.MINUTE)
+
+        // Allowed from 7:00 (7) to 23:30 (11:30 PM)
+        val isAfterStartTime = hour >= 7
+        val isBeforeEndTime = hour < 23 || (hour == 23 && minute <= 30)
+
+        return isAfterStartTime && isBeforeEndTime
+    }
+
     private fun handleSearchClick() {
+        if (!isWithinAllowedHours()) {
+            AlertDialog.Builder(this)
+                .setTitle("Horario de Consulta")
+                .setMessage("Las consultas no están disponibles más que en el horario de 7am a 11:30pm.")
+                .setPositiveButton("Entendido", null)
+                .show()
+            return
+        }
+
         val dni = binding.dniInput.text.toString().trim()
         if (dni.length != 8) {
             binding.dniInput.error = "El DNI debe tener 8 dígitos"

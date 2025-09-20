@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">ConsultaDNI</string>
+    <string name="app_name">Consulta de Datos</string>
     <string name="dni_hint">Ingrese su DNI</string>
     <string name="search_button">Buscar</string>
     <string name="result_label_name">Nombre:</string>
@@ -12,4 +12,15 @@
     <string name="login_email_hint">Correo Electrónico</string>
     <string name="login_password_hint">Contraseña</string>
     <string name="login_button_text">Ingresar</string>
+
+    <!-- Dashboard Screen -->
+    <string name="dashboard_button_data">Consulta de Datos</string>
+    <string name="dashboard_button_buro">Consulta de Buró</string>
+
+    <!-- Buro Screen -->
+    <string name="buro_label">Consulta de Buró</string>
+    <string name="buro_radio_dni">DNI</string>
+    <string name="buro_radio_ruc">RUC</string>
+    <string name="buro_input_hint">Ingrese número</string>
+    <string name="buro_search_button">Buscar</string>
 </resources>

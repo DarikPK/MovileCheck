@@ -12,6 +12,7 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
+import com.example.consultadni.AppConfig
 
 /**
  * API de Retrofit
@@ -48,7 +49,7 @@ object NetworkModule {
 
     val api: BuroApi by lazy {
         Retrofit.Builder()
-            .baseUrl("https://intranet.elcristalperu.com") // ajusta si cambia
+            .baseUrl("https://intranet.elcristalperu.com")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -61,24 +62,41 @@ object NetworkModule {
  */
 class BuroRepository {
 
+    suspend fun loginWithRecaptcha(recaptchaToken: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // The user's new code uses different keys for login
+                val body = mapOf(
+                    "usuario" to AppConfig.DEMO_USUARIO,
+                    "contrasenia" to AppConfig.DEMO_PASSWORD,
+                    "recaptchaToken" to recaptchaToken
+                )
+                val resp = NetworkModule.api.login(body)
+                if (resp.isSuccessful) {
+                    Result.success(Unit)
+                } else {
+                    val err = resp.errorBody()?.string() ?: "Código ${resp.code()}"
+                    Result.failure(Exception("Login fallido: $err"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
     suspend fun consultaNumero(numero: String, isDni: Boolean): Result<JsonObject> {
         return withContext(Dispatchers.IO) {
             try {
-                // 1. Login (usuario hardcodeado de demo)
-                val loginBody = mapOf("id" to "46736604", "password" to "Ale07072022")
-                val loginResp = NetworkModule.api.login(loginBody)
-                if (!loginResp.isSuccessful) {
-                    return@withContext Result.failure(Exception("Login fallido"))
-                }
+                // **LOGIN STEP REMOVED** - It's now handled separately in the Activity.
 
-                // 2. Obtener _token desde la página
+                // 1. Obtener _token desde la página (Assumes user is already logged in)
                 val pageResp = NetworkModule.api.getRiesgoPage()
                 val html = pageResp.body() ?: ""
                 val regex = Regex("<meta name=\"csrf-token\" content=\"([^\"]+)\">")
                 val token = regex.find(html)?.groupValues?.get(1)
-                    ?: return@withContext Result.failure(Exception("No CSRF token"))
+                    ?: return@withContext Result.failure(Exception("No CSRF token. Sesión podría haber expirado."))
 
-                // 3. Construir snapshot dinámico
+                // 2. Construir snapshot dinámico
                 val snapshotStr = """{"data":{"tipoPersona":"1","tipoDocumento":"${if (isDni) "1" else "6"}","documento":"$numero"},"memo":{"id":"8OXIHjWHHpci5A1CYPXO","name":"intranet.comercial.riesgo","path":"comercial/riesgo","method":"GET","children":[],"scripts":[],"assets":[],"errors":[],"locale":"es"},"checksum":"b1be354c1fc4421124d47297bec10294d8f15cd5c9ced39c36401b2398e6bd43"}"""
 
                 val component = mapOf(
@@ -98,7 +116,7 @@ class BuroRepository {
                     "components" to listOf(component)
                 )
 
-                // 4. Hacer la consulta
+                // 3. Hacer la consulta
                 val resp = NetworkModule.api.livewireUpdate(body)
                 if (resp.isSuccessful && resp.body() != null) {
                     Result.success(resp.body()!!)

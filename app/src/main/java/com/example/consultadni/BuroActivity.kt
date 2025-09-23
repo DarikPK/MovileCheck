@@ -10,9 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.consultadni.data.BuroRepository
 import com.example.consultadni.databinding.ActivityBuroBinding
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.recaptcha.Recaptcha
-import com.google.android.gms.recaptcha.RecaptchaClient
-import com.google.android.gms.recaptcha.RecaptchaResultData
+import com.google.android.gms.safetynet.SafetyNet
 import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
@@ -20,10 +18,6 @@ class BuroActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBuroBinding
     private val repo = BuroRepository()
-    private val recaptchaClient: RecaptchaClient by lazy {
-        Recaptcha.getClient(this)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBuroBinding.inflate(layoutInflater)
@@ -76,9 +70,9 @@ class BuroActivity : AppCompatActivity() {
     }
 
     private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
-        recaptchaClient.verify()
-            .addOnSuccessListener { result: RecaptchaResultData ->
-                val token = result.tokenResult
+        SafetyNet.getClient(this).verifyWithRecaptcha(AppConfig.RECAPTCHA_SITE_KEY)
+            .addOnSuccessListener { response ->
+                val token = response.tokenResult
                 if (!token.isNullOrEmpty()) {
                     Log.d("BuroActivity", "reCAPTCHA token received.")
                     proceedWithLogin(token, number, isDni)
@@ -86,7 +80,7 @@ class BuroActivity : AppCompatActivity() {
                     runOnUiThread { showError("Error de reCAPTCHA: Token vacío") }
                 }
             }
-            .addOnFailureListener { e: Exception ->
+            .addOnFailureListener { e ->
                 Log.e("BuroActivity", "reCAPTCHA verification failed", e)
                 val msg = if (e is ApiException) { "API error ${e.statusCode}" } else { e.message ?: "Error desconocido" }
                 runOnUiThread { showError("Error en reCAPTCHA: $msg") }

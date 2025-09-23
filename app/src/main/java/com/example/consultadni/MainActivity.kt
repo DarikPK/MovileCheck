@@ -14,9 +14,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.consultadni.databinding.ActivityMainBinding
-import com.google.android.gms.recaptcha.Recaptcha
-import com.google.android.gms.recaptcha.RecaptchaClient
-import com.google.android.gms.recaptcha.RecaptchaResultData
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -24,9 +21,6 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val recaptchaClient: RecaptchaClient by lazy {
-        Recaptcha.getClient(this)
-    }
 
     private var isSearchPageReady = false
     private var isProcessingSearch = false
@@ -56,21 +50,6 @@ class MainActivity : AppCompatActivity() {
         setupWebView()
         binding.webView.loadUrl(BASE_URL)
         binding.searchButton.setOnClickListener { handleSearchClick() }
-        // The test button was removed from the layout, but the logic is here for reference if needed later.
-        // binding.recaptchaTestButton.setOnClickListener { handleRecaptchaTest() }
-    }
-
-    private fun handleRecaptchaTest() {
-        recaptchaClient.verify(AppConfig.RECAPTCHA_SITE_KEY)
-            .addOnSuccessListener { result: RecaptchaResultData ->
-                val token = result.tokenResult
-                Log.d(TAG, "reCAPTCHA token: $token")
-                Toast.makeText(this, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
-            }
-            .addOnFailureListener { e: Exception ->
-                Log.e(TAG, "reCAPTCHA verification failed", e)
-                Toast.makeText(this, "Error en captcha ❌", Toast.LENGTH_SHORT).show()
-            }
     }
 
     @SuppressLint("SetJavaScriptEnabled")

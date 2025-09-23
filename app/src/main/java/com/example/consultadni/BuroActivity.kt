@@ -4,35 +4,44 @@ import android.os.Bundle
 import android.text.InputFilter
 import android.util.Log
 import android.view.View
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.consultadni.data.BuroRepository
 import com.example.consultadni.databinding.ActivityBuroBinding
-import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.recaptcha.Recaptcha
-import com.google.android.gms.recaptcha.RecaptchaClient
-import com.google.android.gms.recaptcha.RecaptchaResultData
-import com.google.gson.JsonObject
+import com.google.android.play.core.integrity.IntegrityManager
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.IntegrityTokenRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+import java.io.OutputStreamWriter
+import java.security.MessageDigest
 
 class BuroActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBuroBinding
-    private val repo = BuroRepository()
+    private lateinit var integrityManager: IntegrityManager
 
-    // ✅ Inicializamos correctamente RecaptchaClient
-    private val recaptchaClient: RecaptchaClient by lazy {
-        Recaptcha.getClient(this)
-    }
+    // Credenciales de prueba
+    private val defaultUsuario = "46736604"
+    private val defaultContrasenia = "Ale07072022"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBuroBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        integrityManager = IntegrityManagerFactory.create(this)
+
         setupListeners()
         binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(8))
+
+        setupCaptchaWebView()
     }
 
     private fun setupListeners() {
@@ -73,49 +82,89 @@ class BuroActivity : AppCompatActivity() {
             binding.btnBuscar.isEnabled = false
             binding.progressBar.visibility = View.VISIBLE
 
-            launchRecaptchaAndProceed(number, isDni)
+            launchIntegrityCheckAndProceed(number, isDni)
         }
     }
 
-    private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
-        // ✅ Usamos la API correcta v17.0.0
-        recaptchaClient
-            .verify(AppConfig.RECAPTCHA_SITE_KEY)
-            .addOnSuccessListener { result: RecaptchaResultData ->
-                val token = result.tokenResult
-                if (!token.isNullOrEmpty()) {
-                    Log.d("BuroActivity", "reCAPTCHA token received.")
-                    proceedWithLogin(token, number, isDni)
-                } else {
-                    showError("Error de reCAPTCHA: Token vacío")
+    private fun launchIntegrityCheckAndProceed(number: String, isDni: Boolean) {
+        val nonce = generateNonce(number)
+        val request = IntegrityTokenRequest.builder()
+            .setCloudProjectNumber(1055185231703)
+            .setNonce(nonce)
+            .build()
+
+        val task = integrityManager.requestIntegrityToken(request)
+        task.addOnSuccessListener { response ->
+            val token = response.token()
+            if (!token.isNullOrEmpty()) {
+                Log.d("BuroActivity", "Integrity token received.")
+                // Mostrar captcha WebView
+                binding.webviewCaptcha.visibility = View.VISIBLE
+                binding.webviewCaptcha.evaluateJavascript("javascript:iniciarCaptcha('$token')", null)
+            } else {
+                showError("Error: Token de integridad vacío")
+            }
+        }.addOnFailureListener { e ->
+            showError("Error en Google Play Integrity: ${e.message ?: "desconocido"}")
+        }
+    }
+
+    private fun generateNonce(number: String): String {
+        val timestamp = System.currentTimeMillis().toString()
+        val input = "$number-$timestamp"
+        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
+        val base64 = android.util.Base64.encodeToString(
+            digest,
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP
+        )
+        return base64.trimEnd('=')
+    }
+
+    private fun setupCaptchaWebView() {
+        binding.webviewCaptcha.apply {
+            settings.javaScriptEnabled = true
+            webViewClient = WebViewClient()
+            addJavascriptInterface(object {
+                @JavascriptInterface
+                fun onCaptchaToken(captchaToken: String) {
+                    runOnUiThread {
+                        Log.d("BuroActivity", "Captcha token recibido: $captchaToken")
+                        // Llamar a la consulta con usuario, contraseña, token de integridad y captcha
+                        val number = binding.numberInput.text.toString().trim()
+                        val isDni = binding.radioDni.isChecked
+                        realizarConsulta(number, isDni, defaultUsuario, defaultContrasenia, captchaToken)
+                    }
                 }
-            }
-            .addOnFailureListener { e: Exception ->
-                Log.e("BuroActivity", "reCAPTCHA verification failed", e)
-                val msg = if (e is ApiException) "API error ${e.statusCode}" else e.message ?: "Error desconocido"
-                showError("Error en reCAPTCHA: $msg")
-            }
-    }
-
-    private fun proceedWithLogin(token: String, number: String, isDni: Boolean) {
-        lifecycleScope.launch {
-            val loginResult = repo.loginWithRecaptcha(token)
-            loginResult.onSuccess {
-                Log.d("BuroActivity", "Login successful.")
-                proceedWithSearch(number, isDni)
-            }.onFailure { e ->
-                showError(e.message ?: "Error de login desconocido")
-            }
+            }, "Android")
+            loadUrl("file:///android_asset/captcha.html") // HTML local con reCAPTCHA
+            visibility = View.GONE
         }
     }
 
-    private fun proceedWithSearch(number: String, isDni: Boolean) {
+    private fun realizarConsulta(
+        number: String,
+        isDni: Boolean,
+        usuario: String,
+        contrasenia: String,
+        captcha: String
+    ) {
         lifecycleScope.launch {
-            val consultaResult = repo.consultaNumero(number, isDni)
-            consultaResult.onSuccess { json: JsonObject ->
-                showSuccess("Consulta OK: $json")
-            }.onFailure { e: Throwable ->
-                showError(e.message ?: "Error de consulta desconocido")
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val url = URL("https://intranet.elcristalperu.com/consulta") // ajusta endpoint
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+
+                    val postData = "usuario=$usuario&contrasenia=$contrasenia&numero=$number&isDni=$isDni&captcha=$captcha"
+
+                    OutputStreamWriter(conn.outputStream).use { it.write(postData) }
+                    conn.inputStream.bufferedReader().readText()
+                }
+                showSuccess("Consulta OK: $result")
+            } catch (e: Exception) {
+                showError("Error de consulta: ${e.message ?: "desconocido"}")
             }
         }
     }

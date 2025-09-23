@@ -13,6 +13,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.recaptcha.Recaptcha
 import com.google.android.gms.recaptcha.RecaptchaAction
 import com.google.android.gms.recaptcha.RecaptchaClient
+import com.google.android.gms.recaptcha.RecaptchaResultData
 import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
@@ -81,10 +82,18 @@ class BuroActivity : AppCompatActivity() {
     }
 
     private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
-        recaptchaClient.execute(RecaptchaAction("search")) // Using custom action string
-            .addOnSuccessListener { token ->
-                Log.d("BuroActivity", "reCAPTCHA token received.")
-                proceedWithLogin(token, number, isDni)
+        // Note: The user's code snippet uses RecaptchaAction("login").
+        // This is not a standard action. Standard actions are properties like RecaptchaAction.LOGIN.
+        // However, the API might allow custom string actions. I will use the user's provided syntax.
+        recaptchaClient.execute(RecaptchaAction("search"))
+            .addOnSuccessListener { result ->
+                val token = result.tokenResult
+                if (!token.isNullOrEmpty()) {
+                    Log.d("BuroActivity", "reCAPTCHA token received.")
+                    proceedWithLogin(token, number, isDni)
+                } else {
+                    runOnUiThread { showError("Error de reCAPTCHA: Token vacío") }
+                }
             }
             .addOnFailureListener { e ->
                 Log.e("BuroActivity", "reCAPTCHA execution failed", e)

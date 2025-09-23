@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleRecaptchaTest() {
-        recaptchaClient.execute(RecaptchaAction.LOGIN)
+        recaptchaClient.execute(RecaptchaAction.create("login"))
             .addOnSuccessListener { token ->
                 Log.d(TAG, "reCAPTCHA token: $token")
                 Toast.makeText(this, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()

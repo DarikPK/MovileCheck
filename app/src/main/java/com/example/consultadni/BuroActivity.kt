@@ -1,19 +1,24 @@
 package com.example.consultadni
 
 import android.os.Bundle
+import android.text.InputFilter
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.consultadni.data.BuroRepository
 import com.example.consultadni.databinding.ActivityBuroBinding
-import com.google.android.gms.safetynet.SafetyNet
-import com.google.android.gms.safetynet.SafetyNetApi
+import com.google.android.gms.recaptcha.Recaptcha
+import com.google.android.gms.recaptcha.RecaptchaAction
+import com.google.android.gms.recaptcha.RecaptchaClient
+import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
 class BuroActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBuroBinding
+    private lateinit var recaptchaClient: RecaptchaClient
     private val repo = BuroRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,90 +26,108 @@ class BuroActivity : AppCompatActivity() {
         binding = ActivityBuroBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Botón Buscar -> lanza flow captcha -> login demo -> consulta
-        binding.btnBuscar.setOnClickListener {
-            val numero = binding.numberInput.text.toString().trim()
-            val isDni = binding.radioDni.isChecked
+        recaptchaClient = Recaptcha.getClient(this)
 
-            // validaciones mínimas
-            if (isDni && numero.length != 8) {
-                binding.numberInputLayout.error = "El DNI debe tener 8 dígitos."
-                return@setOnClickListener
-            } else if (!isDni && numero.length != 11) {
-                binding.numberInputLayout.error = "El RUC debe tener 11 dígitos."
-                return@setOnClickListener
-            } else {
-                binding.numberInputLayout.error = null
-            }
+        setupListeners()
+        binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(8))
+    }
 
-            // Deshabilitar UI mientras trabaja
-            binding.btnBuscar.isEnabled = false
-            binding.progressBar.visibility = android.view.View.VISIBLE
-
-            // Lanzar reCAPTCHA
-            launchRecaptcha { token, recaptchaError ->
-                if (recaptchaError != null) {
-                    runOnUiThread {
-                        binding.btnBuscar.isEnabled = true
-                        binding.progressBar.visibility = android.view.View.GONE
-                        Toast.makeText(this, "Error reCAPTCHA: $recaptchaError", Toast.LENGTH_LONG).show()
-                    }
-                    return@launchRecaptcha
+    private fun setupListeners() {
+        binding.typeSelectorGroup.setOnCheckedChangeListener { _, checkedId ->
+            when (checkedId) {
+                R.id.radio_dni -> {
+                    binding.numberInputLayout.hint = getString(R.string.buro_radio_dni)
+                    binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(8))
                 }
+                R.id.radio_ruc -> {
+                    binding.numberInputLayout.hint = getString(R.string.buro_radio_ruc)
+                    binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(11))
+                }
+            }
+            binding.numberInput.text?.clear()
+        }
 
-                // Con token: hacer login con credenciales demo
-                lifecycleScope.launch {
-                    val loginResult = repo.loginWithRecaptcha(token!!)
-                    loginResult.onSuccess {
-                        // Login OK -> ahora consulta
-                        val consulta = repo.consultaNumero(numero, isDni)
-                        consulta.onSuccess { json ->
-                            runOnUiThread {
-                                binding.btnBuscar.isEnabled = true
-                                binding.progressBar.visibility = android.view.View.GONE
-                                Toast.makeText(this@BuroActivity, "Consulta OK", Toast.LENGTH_LONG).show()
-                                // Aquí podrías navegar a pantalla de resultados y pasar json
-                            }
-                        }.onFailure { e ->
-                            runOnUiThread {
-                                binding.btnBuscar.isEnabled = true
-                                binding.progressBar.visibility = android.view.View.GONE
-                                Toast.makeText(this@BuroActivity, "Error consulta: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }.onFailure { e ->
-                        runOnUiThread {
-                            binding.btnBuscar.isEnabled = true
-                            binding.progressBar.visibility = android.view.View.GONE
-                            Toast.makeText(this@BuroActivity, "Error login: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
+        binding.btnBuscar.setOnClickListener {
+            validateAndSearch()
+        }
+    }
+
+    private fun validateAndSearch() {
+        val number = binding.numberInput.text.toString().trim()
+        val isDni = binding.radioDni.isChecked
+
+        var isValid = true
+        if (isDni && number.length != 8) {
+            binding.numberInputLayout.error = "El DNI debe tener 8 dígitos."
+            isValid = false
+        } else if (!isDni && number.length != 11) {
+            binding.numberInputLayout.error = "El RUC debe tener 11 dígitos."
+            isValid = false
+        }
+
+        if (isValid) {
+            binding.numberInputLayout.error = null
+            binding.btnBuscar.isEnabled = false
+            binding.progressBar.visibility = View.VISIBLE
+
+            launchRecaptchaAndProceed(number, isDni)
+        }
+    }
+
+    private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
+        lifecycleScope.launch {
+            recaptchaClient.execute(RecaptchaAction.create("search"))
+                .onSuccess { token ->
+                    Log.d("BuroActivity", "reCAPTCHA token received.")
+                    proceedWithLogin(token, number, isDni)
+                }
+                .onFailure { e ->
+                    Log.e("BuroActivity", "reCAPTCHA execution failed", e)
+                    runOnUiThread {
+                        showError("Error de reCAPTCHA: ${e.message}")
                     }
+                }
+        }
+    }
+
+    private fun proceedWithLogin(token: String, number: String, isDni: Boolean) {
+        lifecycleScope.launch {
+            val loginResult = repo.loginWithRecaptcha(token)
+            loginResult.onSuccess {
+                Log.d("BuroActivity", "Login successful.")
+                proceedWithSearch(number, isDni)
+            }.onFailure { e ->
+                runOnUiThread {
+                    showError("Error de login: ${e.message}")
                 }
             }
         }
     }
 
-    /**
-     * Ejecuta SafetyNet reCAPTCHA y devuelve token o error vía callback.
-     * onComplete(token: String?, errorMsg: String?)
-     */
-    private fun launchRecaptcha(onComplete: (token: String?, errorMsg: String?) -> Unit) {
-        SafetyNet.getClient(this).verifyWithRecaptcha(AppConfig.RECAPTCHA_SITE_KEY)
-            .addOnSuccessListener(this) { response: SafetyNetApi.RecaptchaTokenResponse ->
-                val token = response.tokenResult
-                if (!token.isNullOrEmpty()) {
-                    onComplete(token, null)
-                } else {
-                    onComplete(null, "Token vacío")
+    private fun proceedWithSearch(number: String, isDni: Boolean) {
+        lifecycleScope.launch {
+            val consultaResult = repo.consultaNumero(number, isDni)
+            consultaResult.onSuccess { json: JsonObject ->
+                runOnUiThread {
+                    showSuccess("Consulta OK: $json")
+                }
+            }.onFailure { e: Throwable ->
+                runOnUiThread {
+                    showError("Error en consulta: ${e.message}")
                 }
             }
-            .addOnFailureListener(this) { e ->
-                val msg = if (e is com.google.android.gms.common.api.ApiException) {
-                    "API error ${e.statusCode}"
-                } else {
-                    e.message ?: "Error desconocido"
-                }
-                onComplete(null, msg)
-            }
+        }
+    }
+
+    private fun showError(message: String) {
+        binding.btnBuscar.isEnabled = true
+        binding.progressBar.visibility = View.GONE
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun showSuccess(message: String) {
+        binding.btnBuscar.isEnabled = true
+        binding.progressBar.visibility = View.GONE
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 }

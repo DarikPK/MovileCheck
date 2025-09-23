@@ -10,9 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.consultadni.data.BuroRepository
 import com.example.consultadni.databinding.ActivityBuroBinding
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.recaptcha.Recaptcha
-import com.google.android.gms.recaptcha.RecaptchaAction
-import com.google.android.gms.recaptcha.RecaptchaClient
+import com.google.android.gms.safetynet.SafetyNet
 import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
@@ -20,6 +18,7 @@ class BuroActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBuroBinding
     private val repo = BuroRepository()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBuroBinding.inflate(layoutInflater)
@@ -72,18 +71,26 @@ class BuroActivity : AppCompatActivity() {
     }
 
     private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
-        Recaptcha.getClient(this).execute(RecaptchaAction("search")) // Using custom string action
-            .addOnSuccessListener { result ->
-                val token = result.tokenResult
-                if (!token.isNullOrEmpty()) {
-                    Log.d("BuroActivity", "reCAPTCHA token received.")
-                    proceedWithLogin(token, number, isDni)
-                } else {
-                    runOnUiThread { showError("Error de reCAPTCHA: Token vacío") }
-                }
+        SafetyNet.getClient(this).initiateRecaptcha(AppConfig.RECAPTCHA_SITE_KEY)
+            .addOnSuccessListener { recaptchaHandle ->
+                recaptchaHandle.execute("search")
+                    .addOnSuccessListener { recaptchaResultData ->
+                        val token = recaptchaResultData.tokenResult
+                        if (!token.isNullOrEmpty()) {
+                            Log.d("BuroActivity", "reCAPTCHA token received.")
+                            proceedWithLogin(token, number, isDni)
+                        } else {
+                            runOnUiThread { showError("Error de reCAPTCHA: Token vacío") }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("BuroActivity", "reCAPTCHA execute failed", e)
+                        val msg = if (e is ApiException) { "API error ${e.statusCode}" } else { e.message ?: "Error desconocido" }
+                        runOnUiThread { showError("Error de reCAPTCHA: $msg") }
+                    }
             }
             .addOnFailureListener { e ->
-                Log.e("BuroActivity", "reCAPTCHA execution failed", e)
+                Log.e("BuroActivity", "reCAPTCHA initiate failed", e)
                 val msg = if (e is ApiException) { "API error ${e.statusCode}" } else { e.message ?: "Error desconocido" }
                 runOnUiThread { showError("Error de reCAPTCHA: $msg") }
             }

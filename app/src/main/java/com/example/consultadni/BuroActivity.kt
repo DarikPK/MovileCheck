@@ -13,7 +13,6 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.recaptcha.Recaptcha
 import com.google.android.gms.recaptcha.RecaptchaAction
 import com.google.android.gms.recaptcha.RecaptchaClient
-import com.google.android.gms.recaptcha.RecaptchaResultData
 import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
@@ -82,10 +81,7 @@ class BuroActivity : AppCompatActivity() {
     }
 
     private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
-        // Note: The user's code snippet uses RecaptchaAction("login").
-        // This is not a standard action. Standard actions are properties like RecaptchaAction.LOGIN.
-        // However, the API might allow custom string actions. I will use the user's provided syntax.
-        recaptchaClient.execute(RecaptchaAction("search"))
+        recaptchaClient.execute(RecaptchaAction("search")) // Using custom string action
             .addOnSuccessListener { result ->
                 val token = result.tokenResult
                 if (!token.isNullOrEmpty()) {
@@ -109,7 +105,7 @@ class BuroActivity : AppCompatActivity() {
                 Log.d("BuroActivity", "Login successful.")
                 proceedWithSearch(number, isDni)
             }.onFailure { e ->
-                runOnUiThread { showError("Error de login: ${e.message}") }
+                runOnUiThread { showError(e.message ?: "Error de login desconocido") }
             }
         }
     }
@@ -123,7 +119,7 @@ class BuroActivity : AppCompatActivity() {
                 }
             }.onFailure { e: Throwable ->
                 runOnUiThread {
-                    showError("Error en consulta: ${e.message}")
+                    showError(e.message ?: "Error de consulta desconocido")
                 }
             }
         }

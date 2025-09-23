@@ -13,10 +13,12 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.consultadni.databinding.ActivityMainBinding
-import com.google.android.gms.recaptcha.Recaptcha
-import com.google.android.gms.recaptcha.RecaptchaAction
-import com.google.android.gms.recaptcha.RecaptchaClient
+import com.google.android.recaptcha.Recaptcha
+import com.google.android.recaptcha.RecaptchaAction
+import com.google.android.recaptcha.RecaptchaClient
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -24,7 +26,9 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var recaptchaClient: RecaptchaClient
+    private val recaptchaClient: RecaptchaClient by lazy {
+        Recaptcha.getClient(application)
+    }
 
     private var isSearchPageReady = false
     private var isProcessingSearch = false
@@ -51,8 +55,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        recaptchaClient = Recaptcha.getClient(this)
-
         setupWebView()
         binding.webView.loadUrl(BASE_URL)
         binding.searchButton.setOnClickListener { handleSearchClick() }
@@ -60,24 +62,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleRecaptchaTest() {
-        recaptchaClient.execute(RecaptchaAction.create("login"))
-            .addOnSuccessListener { token ->
-                Log.d(TAG, "reCAPTCHA token: $token")
-                Toast.makeText(this, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "reCAPTCHA execution failed", e)
-                Toast.makeText(this, "Error en captcha ❌", Toast.LENGTH_SHORT).show()
-            }
+        lifecycleScope.launch {
+            recaptchaClient.execute(RecaptchaAction.LOGIN)
+                .onSuccess { token ->
+                    Log.d(TAG, "reCAPTCHA token: $token")
+                    Toast.makeText(this@MainActivity, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
+                }
+                .onFailure { e ->
+                    Log.e(TAG, "reCAPTCHA execution failed", e)
+                    Toast.makeText(this@MainActivity, "Error en captcha ❌", Toast.LENGTH_SHORT).show()
+                }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Prevent memory leaks by removing callbacks
+        recaptchaClient.close()
         loginTimeoutHandler.removeCallbacksAndMessages(null)
         searchPollHandler.removeCallbacksAndMessages(null)
     }
 
+    // ... (rest of the file remains the same)
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         binding.webView.settings.javaScriptEnabled = true
@@ -85,7 +90,6 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.d(TAG, "Page finished loading: $url")
-                // This is now only for detecting the initial login/search page states
                 determineInitialPageState(view)
             }
 
@@ -103,7 +107,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun determineInitialPageState(view: WebView?) {
-        // We only care about detecting the search page to enable the UI
         view?.evaluateJavascript("(function() { return document.getElementsByName('Documento').length > 0; })();") { isSearchPage ->
             if (isSearchPage == "true" && !isSearchPageReady) {
                 Log.d(TAG, "Search page is ready.")
@@ -113,7 +116,6 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Listo para buscar", Toast.LENGTH_SHORT).show()
                 }
             } else if (!isSearchPageReady) {
-                // If it's not the search page, assume it's the login page
                 injectLoginScript(view)
             }
         }
@@ -121,7 +123,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun injectLoginScript(view: WebView?) {
         Log.d(TAG, "Attempting to inject login script.")
-        // Set a timeout only once
         if (loginTimeoutRunnable == null) {
             loginTimeoutRunnable = Runnable {
                 if (!isSearchPageReady) {
@@ -141,13 +142,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun isWithinAllowedHours(): Boolean {
         val calendar = Calendar.getInstance()
-        val hour = calendar.get(Calendar.HOUR_OF_DAY) // 24-hour format
+        val hour = calendar.get(Calendar.HOUR_OF_DAY)
         val minute = calendar.get(Calendar.MINUTE)
-
-        // Allowed from 7:00 (7) to 23:30 (11:30 PM)
         val isAfterStartTime = hour >= 7
         val isBeforeEndTime = hour < 23 || (hour == 23 && minute <= 30)
-
         return isAfterStartTime && isBeforeEndTime
     }
 
@@ -178,9 +176,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun performSearch(dni: String) {
-        // Stop any previous polling task before starting a new one. This is critical.
         searchPollHandler.removeCallbacksAndMessages(null)
-
         Log.d(TAG, "Performing search for DNI: $dni")
         isProcessingSearch = true
         runOnUiThread {
@@ -191,18 +187,12 @@ class MainActivity : AppCompatActivity() {
             binding.textAddress.text = ""
             binding.textPhones.text = ""
         }
-
-        // Click the search button on the web page
         val jsSearchScript = "(function() { document.getElementsByName('Documento')[0].value = '$dni'; var btns = document.getElementsByTagName('button'); for (var i = 0; i < btns.length; i++) { if (btns[i].textContent.includes('Buscar')) { btns[i].click(); return; } } })();"
         binding.webView.evaluateJavascript(jsSearchScript, null)
-
-        // Immediately clear previous results from the DOM to ensure the poller waits for new data
         val jsClearResultsScript = "(function() { try { document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Personas\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.innerHTML = ''; document.evaluate('//div[@class=\"card\" and .//h3[contains(., \"Teléfonos\")]]//tbody', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.innerHTML = ''; } catch(e){} })();"
         binding.webView.postDelayed({
             binding.webView.evaluateJavascript(jsClearResultsScript, null)
-        }, 200) // A small delay to ensure the search click has been processed before clearing
-
-        // Start polling for results
+        }, 200)
         searchStartTime = System.currentTimeMillis()
         searchPollRunnable = object : Runnable {
             override fun run() {
@@ -228,7 +218,6 @@ class MainActivity : AppCompatActivity() {
         view.evaluateJavascript(jsExtractionScript) { result ->
             try {
                 if (result == null || result == "null") {
-                    // Script might fail to execute, poll again
                     searchPollHandler.postDelayed(searchPollRunnable!!, POLLING_INTERVAL_MS)
                     return@evaluateJavascript
                 }
@@ -248,7 +237,6 @@ class MainActivity : AppCompatActivity() {
                         throw Exception(json.getString("message"))
                     }
                     "loading" -> {
-                        // It's still loading, post the runnable again
                         searchPollHandler.postDelayed(searchPollRunnable!!, POLLING_INTERVAL_MS)
                     }
                 }

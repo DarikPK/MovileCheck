@@ -9,27 +9,32 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.consultadni.data.BuroRepository
 import com.example.consultadni.databinding.ActivityBuroBinding
-import com.google.android.gms.recaptcha.Recaptcha
-import com.google.android.gms.recaptcha.RecaptchaAction
-import com.google.android.gms.recaptcha.RecaptchaClient
+import com.google.android.recaptcha.Recaptcha
+import com.google.android.recaptcha.RecaptchaAction
+import com.google.android.recaptcha.RecaptchaClient
 import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
 class BuroActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBuroBinding
-    private lateinit var recaptchaClient: RecaptchaClient
     private val repo = BuroRepository()
+    private val recaptchaClient: RecaptchaClient by lazy {
+        Recaptcha.getClient(application)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBuroBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        recaptchaClient = Recaptcha.getClient(this)
-
         setupListeners()
         binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(8))
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        recaptchaClient.close()
     }
 
     private fun setupListeners() {
@@ -76,7 +81,7 @@ class BuroActivity : AppCompatActivity() {
 
     private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
         lifecycleScope.launch {
-            recaptchaClient.execute(RecaptchaAction.create("search"))
+            recaptchaClient.execute(RecaptchaAction.LOGIN) // Using LOGIN action as it's a protected flow
                 .onSuccess { token ->
                     Log.d("BuroActivity", "reCAPTCHA token received.")
                     proceedWithLogin(token, number, isDni)

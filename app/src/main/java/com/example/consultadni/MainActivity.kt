@@ -24,10 +24,6 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val recaptchaClient: RecaptchaClient by lazy {
-        Recaptcha.getClient(this)
-    }
-
     private var isSearchPageReady = false
     private var isProcessingSearch = false
 
@@ -62,7 +58,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleRecaptchaTest() {
         // This is the corrected, simplified flow
-        recaptchaClient.execute(RecaptchaAction("login")) // Using the user's suggested syntax
+        Recaptcha.getClient(this).execute(RecaptchaAction("login")) // Using the user's suggested syntax
             .addOnSuccessListener { result ->
                 val token = result.tokenResult
                 Log.d(TAG, "reCAPTCHA token: $token")
@@ -76,7 +72,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        recaptchaClient.close()
         loginTimeoutHandler.removeCallbacksAndMessages(null)
         searchPollHandler.removeCallbacksAndMessages(null)
     }

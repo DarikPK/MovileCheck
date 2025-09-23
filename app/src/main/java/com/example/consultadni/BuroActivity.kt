@@ -20,10 +20,6 @@ class BuroActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBuroBinding
     private val repo = BuroRepository()
-    private val recaptchaClient: RecaptchaClient by lazy {
-        Recaptcha.getClient(this)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBuroBinding.inflate(layoutInflater)
@@ -31,11 +27,6 @@ class BuroActivity : AppCompatActivity() {
 
         setupListeners()
         binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(8))
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        recaptchaClient.close()
     }
 
     private fun setupListeners() {
@@ -81,7 +72,7 @@ class BuroActivity : AppCompatActivity() {
     }
 
     private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
-        recaptchaClient.execute(RecaptchaAction("search")) // Using custom string action
+        Recaptcha.getClient(this).execute(RecaptchaAction("search")) // Using custom string action
             .addOnSuccessListener { result ->
                 val token = result.tokenResult
                 if (!token.isNullOrEmpty()) {

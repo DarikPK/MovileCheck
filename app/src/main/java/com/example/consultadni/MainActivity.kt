@@ -14,7 +14,11 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.consultadni.databinding.ActivityMainBinding
-import com.google.android.gms.safetynet.SafetyNet
+import com.google.android.gms.recaptcha.Recaptcha
+import com.google.android.gms.recaptcha.RecaptchaAction
+import com.google.android.gms.recaptcha.RecaptchaClient
+import com.google.android.gms.recaptcha.RecaptchaHandle
+import com.google.android.gms.recaptcha.RecaptchaResultData
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -22,6 +26,10 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val recaptchaClient: RecaptchaClient by lazy {
+        Recaptcha.getClient(this)
+    }
+    private var recaptchaHandle: RecaptchaHandle? = null
 
     private var isSearchPageReady = false
     private var isProcessingSearch = false
@@ -56,20 +64,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleRecaptchaTest() {
-        SafetyNet.getClient(this).verifyWithRecaptcha(AppConfig.RECAPTCHA_SITE_KEY)
-            .addOnSuccessListener { response ->
-                val token = response.tokenResult
-                Log.d(TAG, "reCAPTCHA token: $token")
-                Toast.makeText(this, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
+        recaptchaClient.init(AppConfig.RECAPTCHA_SITE_KEY)
+            .addOnSuccessListener { handle ->
+                this.recaptchaHandle = handle
+                handle.execute(RecaptchaAction("login"))
+                    .addOnSuccessListener { result: RecaptchaResultData ->
+                        val token = result.tokenResult
+                        Log.d(TAG, "reCAPTCHA token: $token")
+                        Toast.makeText(this, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "reCAPTCHA execute failed", e)
+                        Toast.makeText(this, "Error en captcha (execute) ❌", Toast.LENGTH_SHORT).show()
+                    }
             }
             .addOnFailureListener { e ->
-                Log.e(TAG, "reCAPTCHA verification failed", e)
-                Toast.makeText(this, "Error en captcha ❌", Toast.LENGTH_SHORT).show()
+                Log.e(TAG, "reCAPTCHA init failed", e)
+                Toast.makeText(this, "Error en captcha (init) ❌", Toast.LENGTH_SHORT).show()
             }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        recaptchaHandle?.close()
         loginTimeoutHandler.removeCallbacksAndMessages(null)
         searchPollHandler.removeCallbacksAndMessages(null)
     }

@@ -32,6 +32,11 @@ class BuroActivity : AppCompatActivity() {
         binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(8))
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        recaptchaClient.close()
+    }
+
     private fun setupListeners() {
         binding.typeSelectorGroup.setOnCheckedChangeListener { _, checkedId ->
             when (checkedId) {

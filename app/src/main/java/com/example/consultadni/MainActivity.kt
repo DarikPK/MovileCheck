@@ -74,6 +74,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        recaptchaClient.close()
         loginTimeoutHandler.removeCallbacksAndMessages(null)
         searchPollHandler.removeCallbacksAndMessages(null)
     }

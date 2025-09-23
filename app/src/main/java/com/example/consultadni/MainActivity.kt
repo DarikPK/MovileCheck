@@ -73,13 +73,6 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        recaptchaClient.close()
-        loginTimeoutHandler.removeCallbacksAndMessages(null)
-        searchPollHandler.removeCallbacksAndMessages(null)
-    }
-
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         binding.webView.settings.javaScriptEnabled = true

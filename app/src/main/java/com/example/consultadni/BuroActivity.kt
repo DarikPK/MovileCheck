@@ -20,6 +20,8 @@ class BuroActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBuroBinding
     private val repo = BuroRepository()
+
+    // ✅ Inicializamos correctamente RecaptchaClient
     private val recaptchaClient: RecaptchaClient by lazy {
         Recaptcha.getClient(this)
     }
@@ -31,11 +33,6 @@ class BuroActivity : AppCompatActivity() {
 
         setupListeners()
         binding.numberInput.filters = arrayOf(InputFilter.LengthFilter(8))
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        recaptchaClient.close()
     }
 
     private fun setupListeners() {
@@ -81,20 +78,22 @@ class BuroActivity : AppCompatActivity() {
     }
 
     private fun launchRecaptchaAndProceed(number: String, isDni: Boolean) {
-        recaptchaClient.verify(AppConfig.RECAPTCHA_SITE_KEY)
+        // ✅ Usamos la API correcta v17.0.0
+        recaptchaClient
+            .verify(AppConfig.RECAPTCHA_SITE_KEY)
             .addOnSuccessListener { result: RecaptchaResultData ->
                 val token = result.tokenResult
                 if (!token.isNullOrEmpty()) {
                     Log.d("BuroActivity", "reCAPTCHA token received.")
                     proceedWithLogin(token, number, isDni)
                 } else {
-                    runOnUiThread { showError("Error de reCAPTCHA: Token vacío") }
+                    showError("Error de reCAPTCHA: Token vacío")
                 }
             }
             .addOnFailureListener { e: Exception ->
                 Log.e("BuroActivity", "reCAPTCHA verification failed", e)
-                val msg = if (e is ApiException) { "API error ${e.statusCode}" } else { e.message ?: "Error desconocido" }
-                runOnUiThread { showError("Error en reCAPTCHA: $msg") }
+                val msg = if (e is ApiException) "API error ${e.statusCode}" else e.message ?: "Error desconocido"
+                showError("Error en reCAPTCHA: $msg")
             }
     }
 
@@ -105,7 +104,7 @@ class BuroActivity : AppCompatActivity() {
                 Log.d("BuroActivity", "Login successful.")
                 proceedWithSearch(number, isDni)
             }.onFailure { e ->
-                runOnUiThread { showError(e.message ?: "Error de login desconocido") }
+                showError(e.message ?: "Error de login desconocido")
             }
         }
     }
@@ -114,13 +113,9 @@ class BuroActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val consultaResult = repo.consultaNumero(number, isDni)
             consultaResult.onSuccess { json: JsonObject ->
-                runOnUiThread {
-                    showSuccess("Consulta OK: $json")
-                }
+                showSuccess("Consulta OK: $json")
             }.onFailure { e: Throwable ->
-                runOnUiThread {
-                    showError(e.message ?: "Error de consulta desconocido")
-                }
+                showError(e.message ?: "Error de consulta desconocido")
             }
         }
     }

@@ -14,7 +14,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.consultadni.databinding.ActivityMainBinding
-import com.google.android.gms.safetynet.SafetyNet
+import com.google.android.gms.recaptcha.Recaptcha
+import com.google.android.gms.recaptcha.RecaptchaAction
+import com.google.android.gms.recaptcha.RecaptchaHandle
+import com.google.android.gms.recaptcha.RecaptchaResultData
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -22,6 +25,7 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private var recaptchaHandle: RecaptchaHandle? = null
 
     private var isSearchPageReady = false
     private var isProcessingSearch = false
@@ -56,11 +60,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleRecaptchaTest() {
-        SafetyNet.getClient(this).initiateRecaptcha(AppConfig.RECAPTCHA_SITE_KEY)
-            .addOnSuccessListener { recaptchaHandle ->
-                recaptchaHandle.execute("login")
-                    .addOnSuccessListener { recaptchaResultData ->
-                        val token = recaptchaResultData.tokenResult
+        Recaptcha.getClient(this).init(AppConfig.RECAPTCHA_SITE_KEY)
+            .addOnSuccessListener { handle ->
+                this.recaptchaHandle = handle
+                handle.execute(RecaptchaAction.LOGIN)
+                    .addOnSuccessListener { result: RecaptchaResultData ->
+                        val token = result.tokenResult
                         Log.d(TAG, "reCAPTCHA token: $token")
                         Toast.makeText(this, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
                     }
@@ -70,8 +75,8 @@ class MainActivity : AppCompatActivity() {
                     }
             }
             .addOnFailureListener { e ->
-                Log.e(TAG, "reCAPTCHA initiate failed", e)
-                Toast.makeText(this, "Error en captcha (initiate) ❌", Toast.LENGTH_SHORT).show()
+                Log.e(TAG, "reCAPTCHA init failed", e)
+                Toast.makeText(this, "Error en captcha (init) ❌", Toast.LENGTH_SHORT).show()
             }
     }
 

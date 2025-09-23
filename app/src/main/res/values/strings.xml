@@ -27,7 +27,4 @@
 
     <!-- Time Restriction -->
     <string name="time_restriction_message">Las consultas solo están disponibles en el horario de 7am a 11:30pm.</string>
-
-    <!-- reCAPTCHA Test -->
-    <string name="recaptcha_test_button">Probar reCAPTCHA</string>
 </resources>

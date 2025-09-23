@@ -13,12 +13,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import com.example.consultadni.databinding.ActivityMainBinding
-import com.google.android.recaptcha.Recaptcha
-import com.google.android.recaptcha.RecaptchaAction
-import com.google.android.recaptcha.RecaptchaClient
-import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -26,9 +21,6 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val recaptchaClient: RecaptchaClient by lazy {
-        Recaptcha.getClient(application)
-    }
 
     private var isSearchPageReady = false
     private var isProcessingSearch = false
@@ -58,31 +50,16 @@ class MainActivity : AppCompatActivity() {
         setupWebView()
         binding.webView.loadUrl(BASE_URL)
         binding.searchButton.setOnClickListener { handleSearchClick() }
-        binding.recaptchaTestButton.setOnClickListener { handleRecaptchaTest() }
-    }
-
-    private fun handleRecaptchaTest() {
-        lifecycleScope.launch {
-            recaptchaClient.execute(RecaptchaAction.LOGIN)
-                .onSuccess { token ->
-                    Log.d(TAG, "reCAPTCHA token: $token")
-                    Toast.makeText(this@MainActivity, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
-                }
-                .onFailure { e ->
-                    Log.e(TAG, "reCAPTCHA execution failed", e)
-                    Toast.makeText(this@MainActivity, "Error en captcha ❌", Toast.LENGTH_SHORT).show()
-                }
-        }
+        // The test button listener is removed, and the button itself will be removed from the layout next.
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        recaptchaClient.close()
+        // Prevent memory leaks by removing callbacks
         loginTimeoutHandler.removeCallbacksAndMessages(null)
         searchPollHandler.removeCallbacksAndMessages(null)
     }
 
-    // ... (rest of the file remains the same)
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         binding.webView.settings.javaScriptEnabled = true

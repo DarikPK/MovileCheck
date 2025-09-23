@@ -14,6 +14,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.consultadni.databinding.ActivityMainBinding
+import com.google.android.gms.recaptcha.Recaptcha
+import com.google.android.gms.recaptcha.RecaptchaAction
+import com.google.android.gms.recaptcha.RecaptchaClient
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -21,6 +24,7 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var recaptchaClient: RecaptchaClient
 
     private var isSearchPageReady = false
     private var isProcessingSearch = false
@@ -46,9 +50,25 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        recaptchaClient = Recaptcha.getClient(this)
+
         setupWebView()
         binding.webView.loadUrl(BASE_URL)
         binding.searchButton.setOnClickListener { handleSearchClick() }
+        binding.recaptchaTestButton.setOnClickListener { handleRecaptchaTest() }
+    }
+
+    private fun handleRecaptchaTest() {
+        recaptchaClient.execute(RecaptchaAction.LOGIN)
+            .addOnSuccessListener { token ->
+                Log.d(TAG, "reCAPTCHA token: $token")
+                Toast.makeText(this, "Captcha verificado ✅", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "reCAPTCHA execution failed", e)
+                Toast.makeText(this, "Error en captcha ❌", Toast.LENGTH_SHORT).show()
+            }
     }
 
     override fun onDestroy() {

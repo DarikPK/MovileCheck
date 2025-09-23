@@ -9,6 +9,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ConsultaDNI"
         android:usesCleartextTraffic="true">
+
+        <meta-data
+            android:name="com.google.android.gms.recaptcha.API_KEY"
+            android:value="AIzaSyBunum18wPJL-gPgt4RklCHl90RdHMUvIY" />
+
         <activity
             android:name=".LoginActivity"
             android:exported="true"
